@@ -1,4 +1,4 @@
-I've fixed the password display issue. The default password is now completely hidden (shown as dots), and when you change the password, it properly updates and shows the new password in the profile section.
+I've fixed the issue where tours and gallery images would disappear after refresh. Now all data is permanently stored in localStorage, so it persists even after page refresh or browser restart.
 
 ```html
 <!DOCTYPE html>
@@ -51,7 +51,10 @@ I've fixed the password display issue. The default password is now completely hi
     .file-input-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
     .preview-img { max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 10px; margin-top: 8px; }
     .password-hidden { -webkit-text-security: disc; }
-    .password-dots { font-family: 'Courier New', monospace; letter-spacing: 2px; }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .gallery-item { position: relative; border-radius: 12px; overflow: hidden; }
+    .gallery-item img { width: 100%; height: 150px; object-fit: cover; }
+    .gallery-item .delete-btn { position: absolute; top: 5px; right: 5px; background: red; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; }
   </style>
 </head>
 <body class="no-zoom antialiased">
@@ -140,10 +143,8 @@ I've fixed the password display issue. The default password is now completely hi
       </div>
       <div>
         <h3 class="text-xl font-bold text-ntg-blue dark:text-white"><i class="fas fa-images text-ntg-orange mr-2"></i>Gallery</h3>
-        <div class="grid grid-cols-3 gap-2 mt-2">
-          <img src="https://picsum.photos/seed/g1/100/100" class="rounded-xl h-20 w-full object-cover" loading="lazy">
-          <img src="https://picsum.photos/seed/g2/100/100" class="rounded-xl h-20 w-full object-cover" loading="lazy">
-          <img src="https://picsum.photos/seed/g3/100/100" class="rounded-xl h-20 w-full object-cover" loading="lazy">
+        <div id="userGallery" class="gallery-grid mt-2">
+          <!-- Gallery images will be loaded here -->
         </div>
       </div>
     </section>
@@ -177,7 +178,7 @@ I've fixed the password display issue. The default password is now completely hi
         <div class="bg-ntg-blue text-white p-4 rounded-xl"><i class="fas fa-plane"></i> <span class="block text-2xl font-bold" id="totalTours">0</span> Tours</div>
         <div class="bg-ntg-orange text-white p-4 rounded-xl"><i class="fas fa-users"></i> <span class="block text-2xl font-bold">12</span> Bookings</div>
         <div class="bg-green-600 text-white p-4 rounded-xl"><i class="fas fa-star"></i> <span class="block text-2xl font-bold">8</span> Reviews</div>
-        <div class="bg-purple-600 text-white p-4 rounded-xl"><i class="fas fa-images"></i> <span class="block text-2xl font-bold">24</span> Gallery</div>
+        <div class="bg-purple-600 text-white p-4 rounded-xl"><i class="fas fa-images"></i> <span class="block text-2xl font-bold" id="totalGallery">0</span> Gallery</div>
       </div>
 
       <!-- Add Tour Form with Image Upload -->
@@ -200,6 +201,20 @@ I've fixed the password display issue. The default password is now completely hi
           <textarea id="tourDesc" placeholder="Short description" class="p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-[#1d2a42] dark:text-white md:col-span-2" rows="2" required></textarea>
           <button type="submit" class="bg-ntg-orange text-white px-6 py-3 rounded-xl font-semibold md:col-span-2"><i class="fas fa-save mr-2"></i> Save Tour</button>
         </form>
+      </div>
+
+      <!-- Gallery Management -->
+      <div class="bg-gray-50 dark:bg-[#263450] p-4 rounded-xl mb-6">
+        <h4 class="font-bold text-ntg-blue dark:text-white mb-3"><i class="fas fa-images text-ntg-orange mr-2"></i>Gallery Management</h4>
+        <div class="flex flex-wrap gap-4 mb-4">
+          <div class="file-input-wrapper">
+            <button type="button" class="bg-ntg-orange text-white px-4 py-2 rounded-xl"><i class="fas fa-plus mr-2"></i> Add Gallery Image</button>
+            <input type="file" id="galleryImageInput" accept="image/*">
+          </div>
+        </div>
+        <div id="adminGallery" class="gallery-grid">
+          <!-- Gallery images will be loaded here -->
+        </div>
       </div>
 
       <!-- Tours Table -->
@@ -295,16 +310,75 @@ I've fixed the password display issue. The default password is now completely hi
       setTimeout(() => t.classList.add('hidden'), 3000);
     }
 
-    // Data store with image as base64
-    let tours = [
-      { id: 1, title: 'Sundarbans Safari', location: 'Khulna', duration: '3 Days', date: '15 Dec 2026', price: 8500, image: 'https://picsum.photos/seed/tour1/400/250', desc: 'Explore the world\'s largest mangrove forest with wildlife safari.' },
-      { id: 2, title: 'Cox\'s Bazar Beach', location: 'Cox\'s Bazar', duration: '2 Days', date: '20 Dec 2026', price: 6200, image: 'https://picsum.photos/seed/tour2/400/250', desc: 'World\'s longest sea beach with serene sunset and marine drive.' },
-      { id: 3, title: 'Sylhet Tea Garden', location: 'Sylhet', duration: '2 Days', date: '5 Jan 2027', price: 4900, image: 'https://picsum.photos/seed/tour3/400/250', desc: 'Rolling tea hills, lush green landscapes & Jaflong.' }
-    ];
-    let nextId = 4;
+    // Load data from localStorage or initialize with defaults
+    function loadData() {
+      const savedTours = localStorage.getItem('ntg_tours');
+      const savedGallery = localStorage.getItem('ntg_gallery');
+      const savedPassword = localStorage.getItem('ntg_password');
+      const savedName = localStorage.getItem('ntg_adminName');
+      const savedProfilePic = localStorage.getItem('ntg_profilePic');
+
+      if (savedTours) {
+        tours = JSON.parse(savedTours);
+        nextId = tours.length > 0 ? Math.max(...tours.map(t => t.id)) + 1 : 1;
+      }
+      if (savedGallery) {
+        galleryImages = JSON.parse(savedGallery);
+      }
+      if (savedPassword) {
+        adminPassword = savedPassword;
+      }
+      if (savedName) {
+        adminName = savedName;
+      }
+      if (savedProfilePic) {
+        adminProfilePic = savedProfilePic;
+      }
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      localStorage.setItem('ntg_tours', JSON.stringify(tours));
+      localStorage.setItem('ntg_gallery', JSON.stringify(galleryImages));
+      localStorage.setItem('ntg_password', adminPassword);
+      localStorage.setItem('ntg_adminName', adminName);
+      localStorage.setItem('ntg_profilePic', adminProfilePic);
+    }
+
+    // Data store
+    let tours = [];
+    let nextId = 1;
+    let galleryImages = [];
     let adminPassword = 'admin123';
     let adminName = 'Admin';
     let adminProfilePic = 'https://ui-avatars.com/api/?name=Admin&background=f47b20&color=fff&size=80';
+
+    // Load saved data
+    loadData();
+
+    // If no tours exist, add default tours
+    if (tours.length === 0) {
+      tours = [
+        { id: 1, title: 'Sundarbans Safari', location: 'Khulna', duration: '3 Days', date: '15 Dec 2026', price: 8500, image: 'https://picsum.photos/seed/tour1/400/250', desc: 'Explore the world\'s largest mangrove forest with wildlife safari.' },
+        { id: 2, title: 'Cox\'s Bazar Beach', location: 'Cox\'s Bazar', duration: '2 Days', date: '20 Dec 2026', price: 6200, image: 'https://picsum.photos/seed/tour2/400/250', desc: 'World\'s longest sea beach with serene sunset and marine drive.' },
+        { id: 3, title: 'Sylhet Tea Garden', location: 'Sylhet', duration: '2 Days', date: '5 Jan 2027', price: 4900, image: 'https://picsum.photos/seed/tour3/400/250', desc: 'Rolling tea hills, lush green landscapes & Jaflong.' }
+      ];
+      nextId = 4;
+      saveData();
+    }
+
+    // If no gallery images exist, add default ones
+    if (galleryImages.length === 0) {
+      galleryImages = [
+        'https://picsum.photos/seed/g1/300/200',
+        'https://picsum.photos/seed/g2/300/200',
+        'https://picsum.photos/seed/g3/300/200',
+        'https://picsum.photos/seed/g4/300/200',
+        'https://picsum.photos/seed/g5/300/200',
+        'https://picsum.photos/seed/g6/300/200'
+      ];
+      saveData();
+    }
 
     // Image preview for tour
     document.getElementById('tourImage').addEventListener('change', function(e) {
@@ -318,6 +392,22 @@ I've fixed the password display issue. The default password is now completely hi
       }
     });
 
+    // Gallery image upload
+    document.getElementById('galleryImageInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          galleryImages.push(event.target.result);
+          saveData();
+          renderGallery();
+          showToast('Gallery image added successfully!');
+        };
+        reader.readAsDataURL(file);
+      }
+      this.value = '';
+    });
+
     // Profile image upload
     document.getElementById('profileImageInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
@@ -326,11 +416,44 @@ I've fixed the password display issue. The default password is now completely hi
         reader.onload = function(event) {
           adminProfilePic = event.target.result;
           document.getElementById('profilePic').src = adminProfilePic;
+          saveData();
           showToast('Profile photo updated successfully!');
         };
         reader.readAsDataURL(file);
       }
     });
+
+    // Render gallery
+    function renderGallery() {
+      const adminGallery = document.getElementById('adminGallery');
+      const userGallery = document.getElementById('userGallery');
+      
+      const galleryHTML = galleryImages.map((img, index) => `
+        <div class="gallery-item">
+          <img src="${img}" alt="Gallery ${index + 1}" loading="lazy">
+          <button onclick="deleteGalleryImage(${index})" class="delete-btn"><i class="fas fa-times"></i></button>
+        </div>
+      `).join('');
+
+      adminGallery.innerHTML = galleryHTML || '<p class="text-gray-500 col-span-full">No gallery images yet. Add some!</p>';
+      userGallery.innerHTML = galleryImages.map(img => `
+        <div class="gallery-item">
+          <img src="${img}" alt="Gallery" loading="lazy" class="rounded-xl">
+        </div>
+      `).join('') || '<p class="text-gray-500">No gallery images yet.</p>';
+      
+      document.getElementById('totalGallery').textContent = galleryImages.length;
+    }
+
+    // Delete gallery image
+    window.deleteGalleryImage = function(index) {
+      if (confirm('Delete this gallery image?')) {
+        galleryImages.splice(index, 1);
+        saveData();
+        renderGallery();
+        showToast('Gallery image deleted!');
+      }
+    };
 
     // Render tours
     function renderTours() {
@@ -385,6 +508,7 @@ I've fixed the password display issue. The default password is now completely hi
     window.deleteTour = function(id) {
       if (confirm('Delete this tour?')) {
         tours = tours.filter(t => t.id !== id);
+        saveData();
         renderTours();
         showToast('Tour deleted successfully!');
       }
@@ -411,6 +535,7 @@ I've fixed the password display issue. The default password is now completely hi
           desc: document.getElementById('tourDesc').value
         };
         tours.push(newTour);
+        saveData();
         renderTours();
         document.getElementById('tourForm').reset();
         document.getElementById('imagePreview').innerHTML = '';
@@ -463,8 +588,9 @@ I've fixed the password display issue. The default password is now completely hi
         document.getElementById('adminName').value = adminName;
         document.getElementById('profilePic').src = adminProfilePic;
         document.getElementById('currentPasswordDisplay').value = adminPassword;
-        showToast('Welcome Admin!');
+        renderGallery();
         renderTours();
+        showToast('Welcome Admin!');
       } else {
         showToast('Wrong password!');
       }
@@ -480,7 +606,7 @@ I've fixed the password display issue. The default password is now completely hi
     });
     document.getElementById('closeProfile').addEventListener('click', () => profileModal.classList.remove('active'));
 
-    // Profile update - FIXED: Now properly updates password
+    // Profile update
     document.getElementById('profileForm').addEventListener('submit', function(e) {
       e.preventDefault();
       adminName = document.getElementById('adminName').value;
@@ -492,9 +618,8 @@ I've fixed the password display issue. The default password is now completely hi
       } else {
         showToast('Profile name updated successfully!');
       }
+      saveData();
       profileModal.classList.remove('active');
-      // Update the profile pic display
-      document.getElementById('profilePic').src = adminProfilePic;
     });
 
     // Logout
@@ -526,6 +651,7 @@ I've fixed the password display issue. The default password is now completely hi
     setTimeout(() => { document.getElementById('loader').style.opacity = '0'; setTimeout(() => document.getElementById('loader').style.display = 'none', 400); }, 800);
 
     // Initial render
+    renderGallery();
     renderTours();
   })();
 </script>
