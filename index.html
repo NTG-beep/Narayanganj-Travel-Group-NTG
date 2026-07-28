@@ -1,4 +1,4 @@
-I've created a complete admin panel with image upload functionality, profile management, and password change options. The system now allows you to upload actual images instead of using URLs, and you can customize your admin profile.
+I've fixed the password display issue. The default password is now completely hidden (shown as dots), and when you change the password, it properly updates and shows the new password in the profile section.
 
 ```html
 <!DOCTYPE html>
@@ -50,6 +50,8 @@ I've created a complete admin panel with image upload functionality, profile man
     .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
     .file-input-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
     .preview-img { max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 10px; margin-top: 8px; }
+    .password-hidden { -webkit-text-security: disc; }
+    .password-dots { font-family: 'Courier New', monospace; letter-spacing: 2px; }
   </style>
 </head>
 <body class="no-zoom antialiased">
@@ -146,13 +148,13 @@ I've created a complete admin panel with image upload functionality, profile man
       </div>
     </section>
 
-    <!-- CONTACT -->
+    <!-- CONTACT with Facebook Page Link -->
     <section class="mt-10 bg-white dark:bg-[#1d2a42] p-6 rounded-2xl shadow-premium">
       <h3 class="text-xl font-bold text-ntg-blue dark:text-white"><i class="fas fa-info-circle text-ntg-orange mr-2"></i>About NTG</h3>
       <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Narayanganj Travel Group – premium travel experiences since 2015.</p>
       <div class="flex flex-wrap gap-4 mt-4 text-sm">
         <a href="https://wa.me/8801627340487" target="_blank" class="bg-green-500 text-white px-4 py-2 rounded-full"><i class="fab fa-whatsapp mr-1"></i> WhatsApp: 01627340487</a>
-        <a href="#" class="bg-blue-600 text-white px-4 py-2 rounded-full"><i class="fab fa-facebook"></i> Facebook</a>
+        <a href="https://www.facebook.com/share/1HKPMnSXnf/" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-full"><i class="fab fa-facebook"></i> Facebook Page</a>
         <a href="#" class="bg-gray-700 text-white px-4 py-2 rounded-full"><i class="fas fa-envelope"></i> Email</a>
       </div>
       <div class="mt-4 text-sm text-gray-500 dark:text-gray-300"><i class="fas fa-phone-alt text-ntg-orange mr-1"></i> +880 1627-340487</div>
@@ -226,7 +228,7 @@ I've created a complete admin panel with image upload functionality, profile man
       <input type="password" id="adminPassword" placeholder="Enter admin password" class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-[#1d2a42] dark:text-white mb-4" required>
       <button type="submit" class="bg-ntg-blue text-white w-full py-3 rounded-xl font-semibold"><i class="fas fa-sign-in-alt mr-2"></i> Login</button>
     </form>
-    <p class="text-xs text-gray-400 mt-3 text-center">Default password: admin123</p>
+    <p class="text-xs text-gray-400 mt-3 text-center">Default password: ********</p>
     <button id="closeLogin" class="mt-3 text-gray-500 w-full"><i class="fas fa-times"></i> Close</button>
   </div>
 </div>
@@ -250,6 +252,10 @@ I've created a complete admin panel with image upload functionality, profile man
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password (leave blank to keep current)</label>
         <input type="password" id="newPassword" placeholder="Enter new password" class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-[#1d2a42] dark:text-white">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</label>
+        <input type="password" id="currentPasswordDisplay" value="admin123" class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed password-hidden" disabled>
       </div>
       <button type="submit" class="bg-ntg-orange text-white w-full py-3 rounded-xl font-semibold"><i class="fas fa-save mr-2"></i> Update Profile</button>
     </form>
@@ -320,7 +326,7 @@ I've created a complete admin panel with image upload functionality, profile man
         reader.onload = function(event) {
           adminProfilePic = event.target.result;
           document.getElementById('profilePic').src = adminProfilePic;
-          showToast('Profile photo updated!');
+          showToast('Profile photo updated successfully!');
         };
         reader.readAsDataURL(file);
       }
@@ -456,6 +462,7 @@ I've created a complete admin panel with image upload functionality, profile man
         document.getElementById('adminPanel').classList.add('active');
         document.getElementById('adminName').value = adminName;
         document.getElementById('profilePic').src = adminProfilePic;
+        document.getElementById('currentPasswordDisplay').value = adminPassword;
         showToast('Welcome Admin!');
         renderTours();
       } else {
@@ -468,21 +475,26 @@ I've created a complete admin panel with image upload functionality, profile man
     document.getElementById('profileBtn').addEventListener('click', () => {
       document.getElementById('adminName').value = adminName;
       document.getElementById('profilePic').src = adminProfilePic;
+      document.getElementById('currentPasswordDisplay').value = adminPassword;
       profileModal.classList.add('active');
     });
     document.getElementById('closeProfile').addEventListener('click', () => profileModal.classList.remove('active'));
 
-    // Profile update
+    // Profile update - FIXED: Now properly updates password
     document.getElementById('profileForm').addEventListener('submit', function(e) {
       e.preventDefault();
       adminName = document.getElementById('adminName').value;
       const newPass = document.getElementById('newPassword').value;
-      if (newPass) {
+      if (newPass && newPass.length > 0) {
         adminPassword = newPass;
+        document.getElementById('currentPasswordDisplay').value = adminPassword;
         showToast('Password updated successfully!');
+      } else {
+        showToast('Profile name updated successfully!');
       }
-      showToast('Profile updated successfully!');
       profileModal.classList.remove('active');
+      // Update the profile pic display
+      document.getElementById('profilePic').src = adminProfilePic;
     });
 
     // Logout
